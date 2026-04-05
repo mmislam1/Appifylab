@@ -1,62 +1,68 @@
 import mongoose from "mongoose";
-import Reaction from "../models/Reaction.js";
+import CommentReaction from "../models/CommentReaction.js";
+import Comment from "../models/Comment.js";
 import Post from "../models/Post.js";
 
-const assertPostAccess = async (postId, userId) => {
-  if (!mongoose.isValidObjectId(postId)) return { error: "Invalid post ID.", status: 400 };
+const assertCommentAccess = async (commentId, userId) => {
+  if (!mongoose.isValidObjectId(commentId)) return { error: "Invalid comment ID.", status: 400 };
+
+  const comment = await Comment.findById(commentId).lean();
+  if (!comment) return { error: "Comment not found.", status: 404 };
+
   const post = await Post.findOne({
-    _id: postId,
+    _id: comment.postId,
     isDeleted: false,
     $or: [{ accessibility: "public" }, { accessibility: "private", userId }],
   }).lean();
-  if (!post) return { error: "Post not found.", status: 404 };
-  return { post };
+
+  if (!post) return { error: "Post not found or not accessible.", status: 404 };
+  return { comment };
 };
 
 /**
- * POST /api/posts/:postId/reactions
+ * POST /api/comments/:commentId/reactions
  * No body. Liked → unlike. Not liked → like.
  */
-export const toggleReaction = async (req, res) => {
+export const toggleCommentReaction = async (req, res) => {
   try {
-    const { postId } = req.params;
+    const { commentId } = req.params;
     const userId = req.user._id;
 
-    const { error, status } = await assertPostAccess(postId, userId);
+    const { error, status } = await assertCommentAccess(commentId, userId);
     if (error) return res.status(status).json({ success: false, message: error });
 
-    const existing = await Reaction.findOne({ postId, userId });
+    const existing = await CommentReaction.findOne({ commentId, userId });
 
     if (existing) {
-      await Reaction.findByIdAndDelete(existing._id);
-      const likesCount = await Reaction.countDocuments({ postId });
+      await CommentReaction.findByIdAndDelete(existing._id);
+      const likesCount = await CommentReaction.countDocuments({ commentId });
       return res.status(200).json({ success: true, liked: false, likesCount });
     }
 
-    await Reaction.create({ postId, userId });
-    const likesCount = await Reaction.countDocuments({ postId });
+    await CommentReaction.create({ commentId, userId });
+    const likesCount = await CommentReaction.countDocuments({ commentId });
     return res.status(200).json({ success: true, liked: true, likesCount });
   } catch (err) {
-    console.error("[toggleReaction]", err);
+    console.error("[toggleCommentReaction]", err);
     return res.status(500).json({ success: false, message: "Server error." });
   }
 };
 
 /**
- * GET /api/posts/:postId/reactions
+ * GET /api/comments/:commentId/reactions
  * Returns: { likesCount, viewerHasLiked }
  */
-export const getReactionSummary = async (req, res) => {
+export const getCommentReactionSummary = async (req, res) => {
   try {
-    const { postId } = req.params;
+    const { commentId } = req.params;
     const userId = req.user._id;
 
-    const { error, status } = await assertPostAccess(postId, userId);
+    const { error, status } = await assertCommentAccess(commentId, userId);
     if (error) return res.status(status).json({ success: false, message: error });
 
     const [likesCount, viewerReaction] = await Promise.all([
-      Reaction.countDocuments({ postId }),
-      Reaction.findOne({ postId, userId }).lean(),
+      CommentReaction.countDocuments({ commentId }),
+      CommentReaction.findOne({ commentId, userId }).lean(),
     ]);
 
     return res.status(200).json({
@@ -65,34 +71,34 @@ export const getReactionSummary = async (req, res) => {
       viewerHasLiked: !!viewerReaction,
     });
   } catch (err) {
-    console.error("[getReactionSummary]", err);
+    console.error("[getCommentReactionSummary]", err);
     return res.status(500).json({ success: false, message: "Server error." });
   }
 };
 
 /**
- * GET /api/posts/:postId/reactions/users?cursor=<_id>&limit=20
- * Paginated list of usernames who liked the post, latest first.
+ * GET /api/comments/:commentId/reactions/users?cursor=<_id>&limit=20
+ * Paginated list of usernames who liked the comment, latest first.
  */
-export const getReactingUsers = async (req, res) => {
+export const getCommentReactingUsers = async (req, res) => {
   try {
-    const { postId } = req.params;
+    const { commentId } = req.params;
     const userId = req.user._id;
 
-    const { error, status } = await assertPostAccess(postId, userId);
+    const { error, status } = await assertCommentAccess(commentId, userId);
     if (error) return res.status(status).json({ success: false, message: error });
 
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
     const { cursor } = req.query;
 
-    const filter = { postId: new mongoose.Types.ObjectId(postId) };
+    const filter = { commentId: new mongoose.Types.ObjectId(commentId) };
     if (cursor) {
       if (!mongoose.isValidObjectId(cursor))
         return res.status(400).json({ success: false, message: "Invalid cursor." });
       filter._id = { $lt: new mongoose.Types.ObjectId(cursor) };
     }
 
-    const reactions = await Reaction.find(filter)
+    const reactions = await CommentReaction.find(filter)
       .sort({ _id: -1 })
       .limit(limit + 1)
       .populate("userId", "firstName lastName")
@@ -113,7 +119,7 @@ export const getReactingUsers = async (req, res) => {
       pagination: { limit, hasNextPage, nextCursor },
     });
   } catch (err) {
-    console.error("[getReactingUsers]", err);
+    console.error("[getCommentReactingUsers]", err);
     return res.status(500).json({ success: false, message: "Server error." });
   }
 };
