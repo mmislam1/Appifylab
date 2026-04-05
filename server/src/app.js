@@ -7,15 +7,12 @@ import morgan from "morgan";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
 
-
-
 // Route modules
 import authRoutes     from "./routes/auth.js";
 import postRoutes     from "./routes/posts.js";
 import commentRoutes  from "./routes/comments.js";
-import reactionRoutes from "./routes/reactions.js";
+import reactionRoutes        from "./routes/reactions.js";
 import commentReactionRoutes from "./routes/commentReactions.js";
-
 
 // ─── App ────────────────────────────────────────────────────────────────────
 
@@ -29,18 +26,10 @@ app.use(
   })
 );
 
-const allowedOrigins = (process.env.CLIENT_ORIGINS ?? "http://localhost:3000")
-  .split(",")
-  .map((o) => o.trim());
 
 app.use(
   cors({
-    origin: (origin, cb) => {
-      if (!origin && process.env.NODE_ENV !== "production") return cb(null, true);
-      if (allowedOrigins.includes(origin)) return cb(null, true);
-      cb(new Error(`CORS blocked: ${origin}`));
-    },
-    credentials: true,
+    origin: "*",
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "x-access-token"],
   })
@@ -78,8 +67,8 @@ app.use("/api/auth", authLimiter);
 app.use("/api/auth",                          authRoutes);
 app.use("/api/posts",                         postRoutes);
 app.use("/api/posts/:postId/comments",        commentRoutes);   // mergeParams: true in comments router
-app.use("/api/posts/:postId/reactions",       reactionRoutes);  // mergeParams: true in reactions router
-app.use("/api/comments/:commentId/reactions", commentReactionRoutes);
+app.use("/api/posts/:postId/reactions",                        reactionRoutes);
+app.use("/api/comments/:commentId/reactions",                  commentReactionRoutes);
 
 // Health check
 app.get("/api/health", (_req, res) =>
