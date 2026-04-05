@@ -8,10 +8,10 @@ import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
 
 // Route modules
-import authRoutes from "./routes/auth.js";
-// import postRoutes    from "./routes/posts.js";    // add as you build
-// import commentRoutes from "./routes/comments.js";
-// import reactionRoutes from "./routes/reactions.js";
+import authRoutes     from "./routes/auth.js";
+import postRoutes     from "./routes/posts.js";
+import commentRoutes  from "./routes/comments.js";
+import reactionRoutes from "./routes/reactions.js";
 
 // ─── App ────────────────────────────────────────────────────────────────────
 
@@ -32,12 +32,11 @@ const allowedOrigins = (process.env.CLIENT_ORIGINS ?? "http://localhost:3000")
 app.use(
   cors({
     origin: (origin, cb) => {
-      // Allow no-origin (curl, Postman) in dev; block in prod
       if (!origin && process.env.NODE_ENV !== "production") return cb(null, true);
       if (allowedOrigins.includes(origin)) return cb(null, true);
       cb(new Error(`CORS blocked: ${origin}`));
     },
-    credentials: true, // required for HttpOnly cookie refresh tokens
+    credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "x-access-token"],
   })
@@ -54,7 +53,7 @@ if (process.env.NODE_ENV !== "test") {
 // ─── Rate limiting ──────────────────────────────────────────────────────────
 
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 min
+  windowMs: 15 * 60 * 1000,
   max: 300,
   standardHeaders: true,
   legacyHeaders: false,
@@ -63,7 +62,7 @@ const globalLimiter = rateLimit({
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20, // stricter for auth endpoints
+  max: 20,
   message: { success: false, message: "Too many auth attempts, please wait." },
 });
 
@@ -72,17 +71,17 @@ app.use("/api/auth", authLimiter);
 
 // ─── Routes ─────────────────────────────────────────────────────────────────
 
-app.use("/api/auth", authRoutes);
-// app.use("/api/posts",     postRoutes);
-// app.use("/api/comments",  commentRoutes);
-// app.use("/api/reactions", reactionRoutes);
+app.use("/api/auth",                          authRoutes);
+app.use("/api/posts",                         postRoutes);
+app.use("/api/posts/:postId/comments",        commentRoutes);   // mergeParams: true in comments router
+app.use("/api/posts/:postId/reactions",       reactionRoutes);  // mergeParams: true in reactions router
 
 // Health check
 app.get("/api/health", (_req, res) =>
   res.json({ success: true, uptime: process.uptime(), timestamp: Date.now() })
 );
 
-// ─── 404 handler ────────────────────────────────────────────────────────────
+// ─── 404 ────────────────────────────────────────────────────────────────────
 
 app.use((_req, res) => {
   res.status(404).json({ success: false, message: "Route not found." });
@@ -94,17 +93,12 @@ app.use((_req, res) => {
 app.use((err, _req, res, _next) => {
   console.error("[Global Error]", err);
 
-  // Mongoose CastError (invalid ObjectId)
   if (err.name === "CastError") {
     return res.status(400).json({ success: false, message: "Invalid ID format." });
   }
-  // Mongoose duplicate key
   if (err.code === 11000) {
     const field = Object.keys(err.keyValue ?? {})[0] ?? "field";
-    return res.status(409).json({
-      success: false,
-      message: `${field} already exists.`,
-    });
+    return res.status(409).json({ success: false, message: `${field} already exists.` });
   }
 
   const status = err.status ?? err.statusCode ?? 500;
@@ -122,7 +116,7 @@ const PORT = process.env.PORT || 5000;
 
 const start = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI,{tls:true});
+    await mongoose.connect(process.env.MONGODB_URI, { tls: true });
     console.log(" MongoDB connected");
 
     app.listen(PORT, () =>
@@ -134,8 +128,8 @@ const start = async () => {
   }
 };
 
-mongoose.connection.on("disconnected", () => console.warn("⚠️  MongoDB disconnected"));
-mongoose.connection.on("reconnected", () => console.log("🔄 MongoDB reconnected"));
+mongoose.connection.on("disconnected", () => console.warn("  MongoDB disconnected"));
+mongoose.connection.on("reconnected", () => console.log(" MongoDB reconnected"));
 
 start();
 
