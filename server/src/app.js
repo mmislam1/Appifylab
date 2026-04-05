@@ -122,9 +122,7 @@ const PORT = process.env.PORT || 5000;
 
 const start = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI, {
-      dbName: process.env.DB_NAME ?? "social-app",
-    });
+    await mongoose.connect(process.env.MONGODB_URI,{tls:true});
     console.log(" MongoDB connected");
 
     app.listen(PORT, () =>

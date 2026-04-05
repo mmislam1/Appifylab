@@ -42,12 +42,11 @@ const postSchema = new mongoose.Schema(
       },
       default: "public",
     },
-    // Denormalised counts — updated via post-save hooks on Reaction/Comment
-    // for cheap reads without aggregation on every feed query
+    
     reactionsCount: { type: Number, default: 0, min: 0 },
     commentsCount: { type: Number, default: 0, min: 0 },
 
-    isDeleted: { type: Boolean, default: false, index: true }, // soft delete
+    isDeleted: { type: Boolean, default: false, index: true }, 
   },
   {
     timestamps: true,
