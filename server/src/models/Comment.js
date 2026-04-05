@@ -14,16 +14,12 @@ const commentSchema = new mongoose.Schema(
       required: [true, "Comment must belong to a user"],
       index: true,
     },
-    // null  → top-level comment
-    // ObjectId → reply to another comment (one level deep is standard;
-    //             for deeper threading, resolve the root via `rootId`)
     replyToId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Comment",
       default: null,
     },
-    // Denormalised root comment id so you can fetch all replies to
-    // a top-level comment in a single query (avoid recursive lookups)
+    
     rootId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Comment",
